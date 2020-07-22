@@ -1,10 +1,13 @@
 #include <windows.h>
+#include <string>
+#include <tlhelp32.h>
+
 
 #define IDC_MAIN_EDIT 101
 #define ID_FILE_EXIT 9001
 #define ID_ABOUT 9002
 #define ID_HELP 9003
-#define ID_KillEM 9004
+#define ID_KILLEM 9004
 
 
 //Globals
@@ -19,6 +22,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 void AddMenu(HWND hwnd);
 void AddControls(HWND hwnd);
+void KillProcess(const std::string& processName);
 
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -109,6 +113,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		case ID_HELP:
 			MessageBox(NULL, "No help, only Zuul.\nOr reaching me on Teams.\n\nOr the Readme:\nhttps://github.com/MariusVentus/ProcessKiller/blob/master/README.md ", "Halp", MB_OK | MB_ICONINFORMATION);
 			break;
+		case ID_KILLEM:
+			//Init
+			char rawNote[3000] = "";
+			std::string stringNote = "";
+			GetWindowText(hProcessName, rawNote, 3000);
+			stringNote = rawNote;
+			//
+			KillProcess(stringNote);
+			break;
 		}
 		break;
 	case WM_CLOSE:
@@ -156,5 +169,28 @@ void AddControls(HWND hwnd)
 
 	//Scrubber, Calculator, Copy to ClipBoard
 	CreateWindowEx(WS_EX_CLIENTEDGE, "Button", "Kill Process!", WS_CHILD | WS_VISIBLE,
-		15, 100, 440, 50, hwnd, (HMENU)ID_KillEM, GetModuleHandle(NULL), NULL);
+		15, 100, 440, 50, hwnd, (HMENU)ID_KILLEM, GetModuleHandle(NULL), NULL);
+}
+
+void KillProcess(const std::string& processName)
+{
+	HANDLE hSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPALL, NULL);
+	PROCESSENTRY32 pEntry;
+	pEntry.dwSize = sizeof(pEntry);
+	BOOL hRes = Process32First(hSnapShot, &pEntry);
+	while (hRes)
+	{
+		if (strcmp(pEntry.szExeFile, processName.c_str()) == 0)
+		{
+			HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, 0,
+				(DWORD)pEntry.th32ProcessID);
+			if (hProcess != NULL)
+			{
+				TerminateProcess(hProcess, 1);
+				CloseHandle(hProcess);
+			}
+		}
+		hRes = Process32Next(hSnapShot, &pEntry);
+	}
+	CloseHandle(hSnapShot);
 }

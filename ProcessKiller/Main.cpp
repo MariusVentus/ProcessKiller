@@ -1,6 +1,8 @@
 #include <windows.h>
 #include <string>
 #include <tlhelp32.h>
+#include <vector>
+#include <algorithm>
 
 
 #define IDC_MAIN_EDIT 101
@@ -12,8 +14,8 @@
 
 //Globals
 const char g_szClassName[] = "myWindowClass";
-const char g_WindowTitle[] = "Process Killer";
-HWND hMainWindow, hProcessName;
+const char g_WindowTitle[] = "Process Killer V0.0.2";
+HWND hMainWindow, hProcessList, hProcessName;
 
 //Forward Declarations
 bool RegisterMainWindow(HINSTANCE hInstance);
@@ -23,6 +25,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 void AddMenu(HWND hwnd);
 void AddControls(HWND hwnd);
 void KillProcess(const std::string& processName);
+std::string GetProcessList();
 
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -63,8 +66,8 @@ bool RegisterMainWindow(HINSTANCE hInstance)
 	wc.hbrBackground = CreateSolidBrush(RGB(100, 0, 0));
 	wc.lpszMenuName = NULL;
 	wc.lpszClassName = g_szClassName;
-	wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-	wc.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
+	wc.hIconSm = (HICON)LoadImage(hInstance, "Resources\\PK.ico", IMAGE_ICON, 16, 16, LR_LOADFROMFILE);
+	wc.hIcon = (HICON)LoadImage(hInstance, "Resources\\PK.ico", IMAGE_ICON, 16, 16, LR_LOADFROMFILE);
 
 	if (!RegisterClassEx(&wc))
 	{
@@ -80,7 +83,7 @@ bool RegisterMainWindow(HINSTANCE hInstance)
 bool CreateMainWindow(HINSTANCE hInstance)
 {
 	hMainWindow = CreateWindowEx(WS_EX_CLIENTEDGE, g_szClassName, g_WindowTitle, WS_OVERLAPPEDWINDOW,
-		CW_USEDEFAULT, CW_USEDEFAULT, 500, 225, NULL, NULL, hInstance, NULL);
+		CW_USEDEFAULT, CW_USEDEFAULT, 500, 440, NULL, NULL, hInstance, NULL);
 
 	if (hMainWindow == NULL)
 	{
@@ -159,17 +162,22 @@ void AddControls(HWND hwnd)
 
 
 	//Main Controls --------------------------------------------------
-
-	//Name
-	CreateWindowEx(WS_EX_CLIENTEDGE, "STATIC", " Process Name", WS_CHILD | WS_VISIBLE,
+	CreateWindowEx(WS_EX_CLIENTEDGE, "STATIC", "Process List", WS_CHILD | WS_VISIBLE,
 		15, 15, 440, 25, hwnd, NULL, GetModuleHandle(NULL), NULL);
-	hProcessName = CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "Process.exe",
+	hProcessList = CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", GetProcessList().c_str(),
+		WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL,
+		15, 40, 440, 200, hwnd, (HMENU)IDC_MAIN_EDIT, GetModuleHandle(NULL), NULL);
+
+	//Process Killing
+	CreateWindowEx(WS_EX_CLIENTEDGE, "STATIC", "Process Name (Case Sensitive)", WS_CHILD | WS_VISIBLE,
+		15, 250, 440, 25, hwnd, NULL, GetModuleHandle(NULL), NULL);
+	hProcessName = CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "ExampleProcess.exe",
 		WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL,
-		15, 40, 440, 50, hwnd, (HMENU)IDC_MAIN_EDIT, GetModuleHandle(NULL), NULL);
+		15, 275, 440, 25, hwnd, (HMENU)IDC_MAIN_EDIT, GetModuleHandle(NULL), NULL);
 
 	//Scrubber, Calculator, Copy to ClipBoard
 	CreateWindowEx(WS_EX_CLIENTEDGE, "Button", "Kill Process!", WS_CHILD | WS_VISIBLE,
-		15, 100, 440, 50, hwnd, (HMENU)ID_KILLEM, GetModuleHandle(NULL), NULL);
+		15, 310, 440, 50, hwnd, (HMENU)ID_KILLEM, GetModuleHandle(NULL), NULL);
 }
 
 void KillProcess(const std::string& processName)
@@ -193,4 +201,40 @@ void KillProcess(const std::string& processName)
 		hRes = Process32Next(hSnapShot, &pEntry);
 	}
 	CloseHandle(hSnapShot);
+}
+
+std::string GetProcessList()
+{
+	//Populate Entity List
+	std::vector<std::string> outputEntries;
+	std::string outputList = "";
+	HANDLE hSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPALL, NULL);
+	PROCESSENTRY32 pEntry;
+	pEntry.dwSize = sizeof(pEntry);
+	BOOL hRes = Process32First(hSnapShot, &pEntry);
+	while (hRes)
+	{
+		outputEntries.emplace_back(pEntry.szExeFile);
+		if (outputEntries.back().find(".exe") == std::string::npos) {
+			outputEntries.pop_back();
+		}
+		hRes = Process32Next(hSnapShot, &pEntry);
+	}
+	
+	//Sort it
+	std::sort(outputEntries.begin(), outputEntries.end());
+	
+	
+	outputList.append(outputEntries[0]);
+	outputList.append("\r\n");
+	for (unsigned i = 1; i < outputEntries.size(); i++) {
+		if (outputEntries[i] != outputEntries[i - 1]) {
+			outputList.append(outputEntries[i]);
+			outputList.append("\r\n");
+		}
+	}
+	outputList.erase(outputList.find_last_of("\r\n"));
+	CloseHandle(hSnapShot);
+
+	return outputList;
 }

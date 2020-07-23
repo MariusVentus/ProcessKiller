@@ -3,7 +3,7 @@
 #include <tlhelp32.h>
 #include <vector>
 #include <algorithm>
-
+#include "TimeKeeper.h"
 
 #define IDC_MAIN_EDIT 101
 #define ID_FILE_EXIT 9001
@@ -16,6 +16,7 @@
 const char g_szClassName[] = "myWindowClass";
 const char g_WindowTitle[] = "Process Killer V0.0.2";
 HWND hMainWindow, hProcessList, hProcessName;
+TimeKeeper Chronos;
 
 //Forward Declarations
 bool RegisterMainWindow(HINSTANCE hInstance);
@@ -45,6 +46,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	while (GetMessage(&Msg, NULL, 0, 0) > 0)
 	{
+		if (Chronos.IntervalCheck(1.0)) {
+			SetWindowText(hProcessList, GetProcessList().c_str());
+		}
 		TranslateMessage(&Msg);
 		DispatchMessage(&Msg);
 	}

@@ -14,7 +14,7 @@
 
 //Globals
 const char g_szClassName[] = "myWindowClass";
-const char g_WindowTitle[] = "Process Killer V0.0.2";
+const char g_WindowTitle[] = "Process Killer V0.0.21";
 HWND hMainWindow, hProcessList, hProcessName;
 
 //Forward Declarations
@@ -215,7 +215,7 @@ std::string GetProcessList()
 	while (hRes)
 	{
 		outputEntries.emplace_back(pEntry.szExeFile);
-		if (outputEntries.back().find(".exe") == std::string::npos) {
+		if (outputEntries.back().find(".exe") == std::string::npos && outputEntries.back().find(".EXE") == std::string::npos) {
 			outputEntries.pop_back();
 		}
 		hRes = Process32Next(hSnapShot, &pEntry);

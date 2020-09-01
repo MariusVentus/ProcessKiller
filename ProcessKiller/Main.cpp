@@ -16,6 +16,9 @@
 const char g_szClassName[] = "myWindowClass";
 const char g_WindowTitle[] = "Process Killer V0.0.21";
 HWND hMainWindow, hProcessList, hProcessName;
+RECT g_MainWin;
+int g_ScrollY = 0;
+int g_ScrollYSensitivity = 50;
 
 //Forward Declarations
 bool RegisterMainWindow(HINSTANCE hInstance);
@@ -26,6 +29,8 @@ void AddMenu(HWND hwnd);
 void AddControls(HWND hwnd);
 void KillProcess(const std::string& processName);
 std::string GetProcessList();
+void ResetScrollbarSize();
+
 
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -82,7 +87,7 @@ bool RegisterMainWindow(HINSTANCE hInstance)
 
 bool CreateMainWindow(HINSTANCE hInstance)
 {
-	hMainWindow = CreateWindowEx(WS_EX_CLIENTEDGE, g_szClassName, g_WindowTitle, WS_OVERLAPPEDWINDOW,
+	hMainWindow = CreateWindowEx(WS_EX_CLIENTEDGE, g_szClassName, g_WindowTitle, WS_OVERLAPPEDWINDOW | WS_VSCROLL,
 		CW_USEDEFAULT, CW_USEDEFAULT, 500, 440, NULL, NULL, hInstance, NULL);
 
 	if (hMainWindow == NULL)
@@ -127,6 +132,76 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			break;
 		}
 		break;
+	case WM_VSCROLL:
+	{
+		auto action = LOWORD(wParam);
+		HWND hScroll = (HWND)lParam;
+		int pos = -1;
+		if (action == SB_THUMBPOSITION || action == SB_THUMBTRACK) {
+			pos = HIWORD(wParam);
+		}
+		else if (action == SB_LINEDOWN) {
+			pos = g_ScrollY + g_ScrollYSensitivity;
+		}
+		else if (action == SB_LINEUP) {
+			pos = g_ScrollY - g_ScrollYSensitivity;
+		}
+		if (pos == -1) {
+			break;
+		}
+		//Keeps repeated commands (IE Buttons) from scrolling to infinity
+		SCROLLINFO si = { 0 };
+		si.cbSize = sizeof(SCROLLINFO);
+		si.fMask = SIF_POS;
+		si.nPos = pos;
+		si.nTrackPos = 0;
+		SetScrollInfo(hMainWindow, SB_VERT, &si, true);
+		GetScrollInfo(hMainWindow, SB_VERT, &si);
+		pos = si.nPos;
+		//As far as I can tell, this was for compatability somehow, but no idea how. I don't need to know how at this point.
+		//POINT pt;
+		//pt.x = 0;
+		//pt.y = pos - g_scrollY;
+		////auto hdc = GetDC(hMainWindow);
+		////LPtoDP(hdc, &pt, 1);
+		////ReleaseDC(hMainWindow, hdc);
+		ScrollWindow(hMainWindow, 0, -(pos - g_ScrollY), NULL, NULL);
+		g_ScrollY = pos;
+	}
+	break;
+	case WM_SIZE:
+		ResetScrollbarSize();
+		break;
+	case WM_MOUSEWHEEL:
+	{
+		int pos = -1;
+		if (GET_WHEEL_DELTA_WPARAM(wParam) > 0) {
+			pos = g_ScrollY - g_ScrollYSensitivity;
+			//mouse wheel scrolled up
+		}
+		else if (GET_WHEEL_DELTA_WPARAM(wParam) < 0) {
+			pos = g_ScrollY + g_ScrollYSensitivity;
+			//mouse wheel scrolled down
+		}
+		else { //always goes here
+			//unknown mouse wheel scroll direction
+			break;
+		}
+		if (pos == -1) {
+			break;
+		}
+		SCROLLINFO si = { 0 };
+		si.cbSize = sizeof(SCROLLINFO);
+		si.fMask = SIF_POS;
+		si.nPos = pos;
+		si.nTrackPos = 0;
+		SetScrollInfo(hMainWindow, SB_VERT, &si, true);
+		GetScrollInfo(hMainWindow, SB_VERT, &si);
+		pos = si.nPos;
+		ScrollWindow(hMainWindow, 0, -(pos - g_ScrollY), NULL, NULL);
+		g_ScrollY = pos;
+	}
+	break;
 	case WM_CLOSE:
 		DestroyWindow(hwnd);
 		break;
@@ -247,4 +322,18 @@ std::string GetProcessList()
 	CloseHandle(hSnapShot);
 
 	return outputList;
+}
+
+void ResetScrollbarSize()
+{
+	GetWindowRect(hMainWindow, &g_MainWin);
+	SCROLLINFO si = { 0 };
+	si.cbSize = sizeof(SCROLLINFO);
+	si.fMask = SIF_ALL;
+	si.nMin = 0;
+	si.nMax = 440;
+	si.nPage = (g_MainWin.bottom - g_MainWin.top);
+	si.nPos = 0;
+	si.nTrackPos = 0;
+	SetScrollInfo(hMainWindow, SB_VERT, &si, true);
 }

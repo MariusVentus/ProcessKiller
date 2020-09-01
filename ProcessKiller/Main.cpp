@@ -15,7 +15,7 @@
 
 //Globals
 const char g_szClassName[] = "myWindowClass";
-const char g_WindowTitle[] = "Process Killer V0.0.21";
+const char g_WindowTitle[] = "Process Killer V0.0.3";
 HWND hMainWindow;
 RECT g_MainWin;
 unsigned g_LastCreatedY = 15;
@@ -116,6 +116,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		AddControls(hwnd);
 		break;
 	case WM_COMMAND:
+	{
+		unsigned killVal = 0;
+		if (wParam >= ID_BUTTONBASE) {
+			killVal = wParam - ID_BUTTONBASE;
+			wParam = ID_KILLEM;
+		}
 		switch (wParam)
 		{
 		case ID_FILE_EXIT:
@@ -128,16 +134,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			MessageBox(NULL, "No help, only Zuul.\nOr reaching me on Teams.\n\nOr the Readme:\nhttps://github.com/MariusVentus/ProcessKiller/blob/master/README.md ", "Halp", MB_OK | MB_ICONINFORMATION);
 			break;
 		case ID_KILLEM:
-			//Init
-			/*char rawNote[3000] = "";
-			std::string stringNote = "";
-			GetWindowText(hProcessName, rawNote, 3000);
-			stringNote = rawNote;
-			//
-			KillProcess(stringNote);*/
+			KillProcess(g_ProcessList[killVal].c_str());
 			break;
 		}
-		break;
+	}
+	break;
 	case WM_VSCROLL:
 	{
 		auto action = LOWORD(wParam);

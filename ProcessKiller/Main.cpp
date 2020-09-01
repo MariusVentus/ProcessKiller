@@ -1,24 +1,28 @@
+#define NOMINMAX
 #include <windows.h>
 #include <string>
 #include <tlhelp32.h>
 #include <vector>
 #include <algorithm>
 
-
 #define IDC_MAIN_EDIT 101
 #define ID_FILE_EXIT 9001
 #define ID_ABOUT 9002
 #define ID_HELP 9003
 #define ID_KILLEM 9004
+#define ID_BUTTONBASE 9050 //Nothing above this.
 
 
 //Globals
 const char g_szClassName[] = "myWindowClass";
 const char g_WindowTitle[] = "Process Killer V0.0.21";
-HWND hMainWindow, hProcessList, hProcessName;
+HWND hMainWindow;
 RECT g_MainWin;
+unsigned g_LastCreatedY = 15;
 int g_ScrollY = 0;
 int g_ScrollYSensitivity = 50;
+std::vector<std::string> g_ProcessList;
+std::vector<HWND> hProcessNames,hProcessKillButton;
 
 //Forward Declarations
 bool RegisterMainWindow(HINSTANCE hInstance);
@@ -28,7 +32,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 void AddMenu(HWND hwnd);
 void AddControls(HWND hwnd);
 void KillProcess(const std::string& processName);
-std::string GetProcessList();
+void GetProcessList();
 void ResetScrollbarSize();
 
 
@@ -88,7 +92,9 @@ bool RegisterMainWindow(HINSTANCE hInstance)
 bool CreateMainWindow(HINSTANCE hInstance)
 {
 	hMainWindow = CreateWindowEx(WS_EX_CLIENTEDGE, g_szClassName, g_WindowTitle, WS_OVERLAPPEDWINDOW | WS_VSCROLL,
-		CW_USEDEFAULT, CW_USEDEFAULT, 500, 440, NULL, NULL, hInstance, NULL);
+		CW_USEDEFAULT, CW_USEDEFAULT, 500, 240, NULL, NULL, hInstance, NULL);
+
+	ResetScrollbarSize();
 
 	if (hMainWindow == NULL)
 	{
@@ -123,12 +129,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			break;
 		case ID_KILLEM:
 			//Init
-			char rawNote[3000] = "";
+			/*char rawNote[3000] = "";
 			std::string stringNote = "";
 			GetWindowText(hProcessName, rawNote, 3000);
 			stringNote = rawNote;
 			//
-			KillProcess(stringNote);
+			KillProcess(stringNote);*/
 			break;
 		}
 		break;
@@ -237,22 +243,37 @@ void AddControls(HWND hwnd)
 
 
 	//Main Controls --------------------------------------------------
-	CreateWindowEx(WS_EX_CLIENTEDGE, "STATIC", "Process List", WS_CHILD | WS_VISIBLE,
-		15, 15, 440, 25, hwnd, NULL, GetModuleHandle(NULL), NULL);
-	hProcessList = CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", GetProcessList().c_str(),
-		WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL,
-		15, 40, 440, 200, hwnd, (HMENU)IDC_MAIN_EDIT, GetModuleHandle(NULL), NULL);
+	g_LastCreatedY = 15;
+	GetProcessList();
+	for (unsigned i = 0; i < g_ProcessList.size(); i++) {
+		hProcessNames.push_back({ 0 });
+		hProcessKillButton.push_back({ 0 });
+	}
 
-	//Process Killing
-	CreateWindowEx(WS_EX_CLIENTEDGE, "STATIC", "Process Name (Case Sensitive)", WS_CHILD | WS_VISIBLE,
-		15, 250, 440, 25, hwnd, NULL, GetModuleHandle(NULL), NULL);
-	hProcessName = CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "ExampleProcess.exe",
-		WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL,
-		15, 275, 440, 25, hwnd, (HMENU)IDC_MAIN_EDIT, GetModuleHandle(NULL), NULL);
+	for (unsigned i = 0; i < g_ProcessList.size(); i++) {
+		hProcessNames[i] = CreateWindowEx(WS_EX_CLIENTEDGE, "STATIC", g_ProcessList[i].c_str(), WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+			15, g_LastCreatedY, 375, 25, hwnd, NULL, GetModuleHandle(NULL), NULL);
+		hProcessKillButton[i] = CreateWindowEx(WS_EX_CLIENTEDGE, "Button", "Kill" , WS_CHILD | WS_VISIBLE, 
+			390, g_LastCreatedY, 55, 25, hwnd, (HMENU)(ID_BUTTONBASE+ i), GetModuleHandle(NULL), NULL);
+		g_LastCreatedY += 35;
+	}
 
-	//Scrubber, Calculator, Copy to ClipBoard
-	CreateWindowEx(WS_EX_CLIENTEDGE, "Button", "Kill Process!", WS_CHILD | WS_VISIBLE,
-		15, 310, 440, 50, hwnd, (HMENU)ID_KILLEM, GetModuleHandle(NULL), NULL);
+	//CreateWindowEx(WS_EX_CLIENTEDGE, "STATIC", "Process List", WS_CHILD | WS_VISIBLE,
+	//	15, 15, 440, 25, hwnd, NULL, GetModuleHandle(NULL), NULL);
+	//hProcessList = CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", GetProcessList().c_str(),
+	//	WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL,
+	//	15, 40, 440, 200, hwnd, (HMENU)IDC_MAIN_EDIT, GetModuleHandle(NULL), NULL);
+
+	////Process Killing
+	//CreateWindowEx(WS_EX_CLIENTEDGE, "STATIC", "Process Name (Case Sensitive)", WS_CHILD | WS_VISIBLE,
+	//	15, 250, 440, 25, hwnd, NULL, GetModuleHandle(NULL), NULL);
+	//hProcessName = CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "ExampleProcess.exe",
+	//	WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL,
+	//	15, 275, 440, 25, hwnd, (HMENU)IDC_MAIN_EDIT, GetModuleHandle(NULL), NULL);
+
+	////Scrubber, Calculator, Copy to ClipBoard
+	//CreateWindowEx(WS_EX_CLIENTEDGE, "Button", "Kill Process!", WS_CHILD | WS_VISIBLE,
+	//	15, 310, 440, 50, hwnd, (HMENU)ID_KILLEM, GetModuleHandle(NULL), NULL);
 }
 
 void KillProcess(const std::string& processName)
@@ -278,11 +299,10 @@ void KillProcess(const std::string& processName)
 	CloseHandle(hSnapShot);
 }
 
-std::string GetProcessList()
+void GetProcessList()
 {
 	//Populate Entity List
 	std::vector<std::pair<std::string,std::string>> outputEntries;
-	std::string outputList = "";
 	HANDLE hSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPALL, NULL);
 	PROCESSENTRY32 pEntry;
 	pEntry.dwSize = sizeof(pEntry);
@@ -309,31 +329,35 @@ std::string GetProcessList()
 	//Sort it
 	std::sort(outputEntries.begin(), outputEntries.end());
 	
-	
-	outputList.append(outputEntries[0].second);
-	outputList.append("\r\n");
-	for (unsigned i = 1; i < outputEntries.size(); i++) {
-		if (outputEntries[i] != outputEntries[i - 1]) {
-			outputList.append(outputEntries[i].second);
-			outputList.append("\r\n");
+	//Return it
+	if (outputEntries.size() > 0) {
+		g_ProcessList.clear();
+		g_ProcessList.reserve(outputEntries.size());
+
+		g_ProcessList.push_back(outputEntries[0].second);
+		for (unsigned i = 1; i < outputEntries.size(); i++) {
+			if (outputEntries[i] != outputEntries[i - 1]) {
+				g_ProcessList.push_back(outputEntries[i].second);
+			}
 		}
 	}
-	outputList.erase(outputList.find_last_of("\r\n"));
-	CloseHandle(hSnapShot);
 
-	return outputList;
+	CloseHandle(hSnapShot);
 }
 
 void ResetScrollbarSize()
 {
+	//Resize
+	const unsigned localMaxSize = g_LastCreatedY + 60;
 	GetWindowRect(hMainWindow, &g_MainWin);
 	SCROLLINFO si = { 0 };
 	si.cbSize = sizeof(SCROLLINFO);
 	si.fMask = SIF_ALL;
 	si.nMin = 0;
-	si.nMax = 440;
+	si.nMax = localMaxSize;
 	si.nPage = (g_MainWin.bottom - g_MainWin.top);
-	si.nPos = 0;
+	si.nPos = g_ScrollY;
 	si.nTrackPos = 0;
 	SetScrollInfo(hMainWindow, SB_VERT, &si, true);
+
 }

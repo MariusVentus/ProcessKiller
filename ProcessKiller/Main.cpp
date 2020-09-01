@@ -206,16 +206,26 @@ void KillProcess(const std::string& processName)
 std::string GetProcessList()
 {
 	//Populate Entity List
-	std::vector<std::string> outputEntries;
+	std::vector<std::pair<std::string,std::string>> outputEntries;
 	std::string outputList = "";
 	HANDLE hSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPALL, NULL);
 	PROCESSENTRY32 pEntry;
 	pEntry.dwSize = sizeof(pEntry);
 	BOOL hRes = Process32First(hSnapShot, &pEntry);
+	std::string withCaps = "";
+	std::string noCaps = "";
+
 	while (hRes)
 	{
-		outputEntries.emplace_back(pEntry.szExeFile);
-		if (outputEntries.back().find(".exe") == std::string::npos && outputEntries.back().find(".EXE") == std::string::npos) {
+		//Generate Pair
+		withCaps = pEntry.szExeFile;
+		noCaps = withCaps;
+		for (unsigned i = 0; i < noCaps.size(); i++) {
+			noCaps[i] = tolower(noCaps[i]);
+		}
+		//Emplace Back
+		outputEntries.emplace_back(noCaps, withCaps);
+		if (outputEntries.back().first.find(".exe") == std::string::npos) {
 			outputEntries.pop_back();
 		}
 		hRes = Process32Next(hSnapShot, &pEntry);
@@ -225,11 +235,11 @@ std::string GetProcessList()
 	std::sort(outputEntries.begin(), outputEntries.end());
 	
 	
-	outputList.append(outputEntries[0]);
+	outputList.append(outputEntries[0].second);
 	outputList.append("\r\n");
 	for (unsigned i = 1; i < outputEntries.size(); i++) {
 		if (outputEntries[i] != outputEntries[i - 1]) {
-			outputList.append(outputEntries[i]);
+			outputList.append(outputEntries[i].second);
 			outputList.append("\r\n");
 		}
 	}

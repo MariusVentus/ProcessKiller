@@ -10,12 +10,13 @@
 #define ID_ABOUT 9002
 #define ID_HELP 9003
 #define ID_KILLEM 9004
+#define ID_REFRESH 9005
 #define ID_BUTTONBASE 9050 //Nothing above this.
 
 
 //Globals
 const char g_szClassName[] = "myWindowClass";
-const char g_WindowTitle[] = "Process Killer V0.0.3";
+const char g_WindowTitle[] = "Process Killer V0.0.35";
 HWND hMainWindow;
 RECT g_MainWin;
 unsigned g_LastCreatedY = 15;
@@ -34,6 +35,7 @@ void AddControls(HWND hwnd);
 void KillProcess(const std::string& processName);
 void GetProcessList();
 void ResetScrollbarSize();
+void RebuildKillList();
 
 
 
@@ -133,8 +135,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		case ID_HELP:
 			MessageBox(NULL, "No help, only Zuul.\nOr reaching me on Teams.\n\nOr the Readme:\nhttps://github.com/MariusVentus/ProcessKiller/blob/master/README.md ", "Halp", MB_OK | MB_ICONINFORMATION);
 			break;
+		case ID_REFRESH:
+			RebuildKillList();
+			ResetScrollbarSize();
+			break;
 		case ID_KILLEM:
 			KillProcess(g_ProcessList[killVal].c_str());
+			RebuildKillList();
+			ResetScrollbarSize();
 			break;
 		}
 	}
@@ -232,6 +240,7 @@ void AddMenu(HWND hwnd)
 	AppendMenu(hMenu, MF_STRING | MF_POPUP, (UINT)hFileMenu, "File ");
 
 	//Remaining Main Menu Items
+	AppendMenu(hMenu, MF_STRING, ID_REFRESH, "Refresh");
 	AppendMenu(hMenu, MF_STRING, ID_ABOUT, "About");
 	AppendMenu(hMenu, MF_STRING, ID_HELP, "Help");
 
@@ -258,23 +267,6 @@ void AddControls(HWND hwnd)
 			390, g_LastCreatedY, 55, 25, hwnd, (HMENU)(ID_BUTTONBASE+ i), GetModuleHandle(NULL), NULL);
 		g_LastCreatedY += 35;
 	}
-
-	//CreateWindowEx(WS_EX_CLIENTEDGE, "STATIC", "Process List", WS_CHILD | WS_VISIBLE,
-	//	15, 15, 440, 25, hwnd, NULL, GetModuleHandle(NULL), NULL);
-	//hProcessList = CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", GetProcessList().c_str(),
-	//	WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL,
-	//	15, 40, 440, 200, hwnd, (HMENU)IDC_MAIN_EDIT, GetModuleHandle(NULL), NULL);
-
-	////Process Killing
-	//CreateWindowEx(WS_EX_CLIENTEDGE, "STATIC", "Process Name (Case Sensitive)", WS_CHILD | WS_VISIBLE,
-	//	15, 250, 440, 25, hwnd, NULL, GetModuleHandle(NULL), NULL);
-	//hProcessName = CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "ExampleProcess.exe",
-	//	WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL,
-	//	15, 275, 440, 25, hwnd, (HMENU)IDC_MAIN_EDIT, GetModuleHandle(NULL), NULL);
-
-	////Scrubber, Calculator, Copy to ClipBoard
-	//CreateWindowEx(WS_EX_CLIENTEDGE, "Button", "Kill Process!", WS_CHILD | WS_VISIBLE,
-	//	15, 310, 440, 50, hwnd, (HMENU)ID_KILLEM, GetModuleHandle(NULL), NULL);
 }
 
 void KillProcess(const std::string& processName)
@@ -291,8 +283,10 @@ void KillProcess(const std::string& processName)
 				(DWORD)pEntry.th32ProcessID);
 			if (hProcess != NULL)
 			{
-				TerminateProcess(hProcess, 1);
+				auto dwRet = TerminateProcess(hProcess, 1);
+				Sleep(50);
 				CloseHandle(hProcess);
+				break;
 			}
 		}
 		hRes = Process32Next(hSnapShot, &pEntry);
@@ -360,5 +354,33 @@ void ResetScrollbarSize()
 	si.nPos = g_ScrollY;
 	si.nTrackPos = 0;
 	SetScrollInfo(hMainWindow, SB_VERT, &si, true);
+
+}
+
+void RebuildKillList()
+{
+	//Reset Scroll position to avoid issues with button creation. 
+	SCROLLINFO si = { 0 };
+	si.cbSize = sizeof(SCROLLINFO);
+	si.fMask = SIF_POS;
+	si.nPos = 0;
+	si.nTrackPos = 0;
+	SetScrollInfo(hMainWindow, SB_VERT, &si, true);
+	GetScrollInfo(hMainWindow, SB_VERT, &si);
+	ScrollWindow(hMainWindow, 0, si.nPos, NULL, NULL);
+	g_ScrollY = si.nPos;
+
+	//Remove Buttons
+	for (unsigned i = 0; i < g_ProcessList.size(); i++) {
+		DestroyWindow(hProcessNames[i]);
+		DestroyWindow(hProcessKillButton[i]);
+	}
+
+	//Clear all window Templates
+	hProcessNames.clear();
+	hProcessKillButton.clear();
+
+	//Re-Add
+	AddControls(hMainWindow);
 
 }
